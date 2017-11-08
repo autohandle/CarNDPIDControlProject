@@ -27,7 +27,7 @@ const void PID::recordExtremes(const double theControlSignal, const double theDi
 }
 
 const void PID::printExtremes() {
-  if (DEBUGPRINT) std::cout << "maxCTE:" << maximumControlSignal << ", minCTE:" << minimumControlSignal << std::endl
+  std::cout << "maxCTE:" << maximumControlSignal << ", minCTE:" << minimumControlSignal << std::endl
             << ", maxdCTE:" << maximumDifferentialControlSignal << ", mindCTE:" << minimumDifferentialControlSignal << std::endl;
 }
 
@@ -63,7 +63,7 @@ const double /* new control value */ PID::Update(const double theControlSignal) 
   previousControlSignal=theControlSignal;
   sumOfAllControlSignals+=theControlSignal;
   recordExtremes(theControlSignal, differentialControlSignal);
-  printExtremes();
+  if (DEBUGPRINT) printExtremes();
   const double clampedControl = min(max(newControl, -1.), 1.);
   if (DEBUGPRINT) std::cout << "PID-CTE:" << theControlSignal \
                             << ", dCTE:" << differentialControlSignal \
@@ -87,12 +87,12 @@ ThrottlePID::ThrottlePID(Sigmoid &theSigmoid, const double theSpeedReference) : 
 
 const double /* throttle */ ThrottlePID::Update(const double theCrossTrackingError) {// throttle between 0 & 1
   // PID::Update between -1 & 1 -> throttleFactor is 0 at 1 & 1 at 0 -> between 0 & 1
-  double throttleFactor=1.-abs(PID::Update(theCrossTrackingError));
-  const double clampedFactor = min(max(throttleFactor, 0.), 1.);
-  const double sigmoidFactor = sigmoid.getValue(throttleFactor);
-  if (DEBUGPRINT) std::cout << "ThrottlePID-clampedFactor:" << clampedFactor << ", sigmoidFactor:" << sigmoidFactor << std::endl;
-  double newSpeed=sigmoidFactor*speedReference;
-  if (DEBUGPRINT) std::cout << "ThrottlePID-throttleFactor:" << throttleFactor << ", newSpeed:" << newSpeed << std::endl;
+  double pidControl=PID::Update(theCrossTrackingError);// -1 -> +1
+  double throttleFactor=1.-abs(pidControl);// abs: +1 -> 0 -> +1 // 1-abs: 0 -> +1 -> 0
+  if (DEBUGPRINT) std::cout << "ThrottlePID-pidControl:" << pidControl << ", throttleFactor:" << throttleFactor << std::endl;
+  if (DEBUGPRINT) PID::printExtremes();
+  double newSpeed=throttleFactor*speedReference;
+  if (DEBUGPRINT) std::cout << "ThrottlePID-theCrossTrackingError:" << theCrossTrackingError << ", newSpeed:" << newSpeed << std::endl;
   return newSpeed;
   
 }
@@ -113,7 +113,7 @@ const double /* throttle */ ThrottlePID::Update(const double theCrossTrackingErr
 // stable    throttle:0.8 Ks:.9,.001,25. Kt:2,0,100 maxCTE:3.4584, minCTE:-3.9159, maxdCTE:0.8101, mindCTE:-0.0664
 
 CarControl::CarControl() :  steeringPID(new PID(*(new P1M1SlopedSigmoid(0.207)))),
-throttlePID(new ThrottlePID(*(new SimpleSlopedSigmoid(5.)/* throttle between 0 & 1*/), 0.7 /* speed reference */)) {
+throttlePID(new ThrottlePID(*(new P1M1SlopedSigmoid(.095)/* throttle between 0 & 1*/), 1. /* speed reference */)) {
   (*steeringPID).Init(1.1/* Kp */, .00001 /* Ki */, 21. /* Kd */);//
   (*throttlePID).Init(10./* Kp */, 0. /* Ki */, 100. /* Kd */);//
 }

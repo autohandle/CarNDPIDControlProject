@@ -55,7 +55,57 @@ Softwares-MacBook-Pro:build david$
 #### Implementation
 ##### The PID procedure follows what was taught in the lessons
 
-![Your Particle Filter Passed](./images/YourParticleFilterPassed.png)
+The algorithm is implemented in
+[PID.cpp](https://github.com/autohandle/CarNDPIDControlProject/blob/master/src/PID.cpp) and [PID.h](https://github.com/autohandle/CarNDPIDControlProject/blob/master/src/PID.h) in the class [CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L115-L132). [CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L115-L132) is both initialized
+``` C++
+CarControl carControl;
+```
+and called by [main.cpp](https://github.com/autohandle/CarNDPIDControlProject/blob/master/src/main.cpp) in the event [on_message](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/main.cpp#L42-L88).
+``` C++
+const double* carControls=carControl.Update(cte, speed);
+steer_value=*carControls;
+throttle=carControls[1];
+// DEBUG
+std::cout << "CTE: " << cte << " Steering Value: " << steer_value << ", throttle:" << throttle << std::endl;
+```
+[CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L115-L132) returns an updated control value for both the `steer_value` and the `throttle` value to be sent to the simulator.
+
+[CarControl::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L124-L132) 
+delegates the steering update to one PID controller and the throttle/speed update to another,
+``` C++
+double steering=(*steeringPID).Update(theCTE);
+double speed=(*throttlePID).Update(theCTE);
+static double controls[2];
+controls[0]=steering;
+controls[1]=speed;
+if (DEBUGPRINT) std::cout << "CarControl-steering:" << controls[0] << ", speed:" << controls[1] << std::endl;
+return controls;
+```
+and then returns the control updates to `main`. The PID controllers were initialized in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L115-L119) constructor.
+``` C++
+CarControl::CarControl() :  steeringPID(new PID(*(new P1M1SlopedSigmoid(0.207)))),
+throttlePID(new ThrottlePID(*(new SimpleSlopedSigmoid(5.)/* throttle between 0 & 1*/), 0.7 /* speed reference */)) {
+  (*steeringPID).Init(1.1/* Kp */, .00001 /* Ki */, 21. /* Kd */);//
+  (*throttlePID).Init(10./* Kp */, 0. /* Ki */, 100. /* Kd */);//
+}
+```
+The streering PID update, [PID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L54-L80), implements the 3 parameter controller discussed in class:
+``` C++
+const double newControl =  -kP * theControlSignal \
+                        -kD *  differentialControlSignal \
+                        -kI * sumOfAllControlSignals;
+
+...
+
+const double sigmoidControl = sigmoid.getValue(newControl);
+```
+The `newControl` value is clamped by using a [sigmoid](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.h#L24-L40)
+<br>
+![sigmoid](./images/LogisticFunction.png)
+<br>
+whose range has been [adjusted](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.h#L64-L81) between -1 and 1
+<br>
+![sigmoid](./images/ErrorFunction.png)
 
 #### Reflection
 ##### The effect each of the P, I, D components
@@ -63,10 +113,6 @@ Softwares-MacBook-Pro:build david$
 The simulation shows a completion time of: 64 seconds. I ran the simulation several times and the maximum finishing time was 95 seconds — that worst-case performance can be viewed in the [video](https://s3.amazonaws.com/autohandle.com/video/CarNDKidnappedVehicleProject.mp4).
 l
 ##### Describe how the final hyperparameters were chosen.
-
-
-The algorithm is implemented in
-[ParticleFilter.cpp](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/master/src/particle_filter.cpp) and [ParticleFIlter.h](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/master/src/particle_filter.h).
 
 ###### [ParticleFilter::init](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/24502292382ccf2178b8a5f79b45967ffa671ea8/src/particle_filter.cpp#L23-L49)
 
