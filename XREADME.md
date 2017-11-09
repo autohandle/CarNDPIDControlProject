@@ -184,7 +184,9 @@ After the car was staying on the track, then the minimum and maximum values were
 // stable    throttle:0.8 Ks:.9,.001,25. Kt:2,0,100 maxCTE:3.8947, minCTE:-3.7933, maxdCTE:1.279, mindCTE:-0.0138
 // stable    throttle:0.8 Ks:.9,.001,25. Kt:2,0,100 maxCTE:3.4584, minCTE:-3.9159, maxdCTE:0.8101, mindCTE:-0.0664
 ```
-were used to inform the selection of the PID parameters. Since a sigmoid was used to clamp the PID control value between 0 and 1, and additional parameter was the slope of the sigmoid which was set in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L115-L119) constructor. All of the parameters were set by using trial and error hand-held gradient descent.
+were used to inform the selection of the PID parameters. Since a sigmoid was used to clamp the PID control value between 0 and 1, an additional parameter was the slope of the sigmoid. The slope of the sigmoid was set in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L115-L119) constructor. The slope of the sigmoid set how fast the control parameter changed when the underlying control varied due to cross track error.
+
+All of the parameters were set by using trial and error hand-held gradient descent.
 
 #### Simulation
 
