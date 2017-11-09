@@ -81,10 +81,10 @@ controls[1]=speed;
 if (DEBUGPRINT) std::cout << "CarControl-steering:" << controls[0] << ", speed:" << controls[1] << std::endl;
 return controls;
 ```
-and then returns the control updates to `main`. The PID controllers were initialized in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L115-L119) constructor.
+and then returns the control updates to `main`. The PID controllers were initialized in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L115-L119) constructor.
 ``` C++
 CarControl::CarControl() :  steeringPID(new PID(*(new P1M1SlopedSigmoid(0.207)))),
-throttlePID(new ThrottlePID(*(new SimpleSlopedSigmoid(5.)/* throttle between 0 & 1*/), 0.7 /* speed reference */)) {
+throttlePID(new ThrottlePID(*(new P1M1SlopedSigmoid(.095)/* throttle between 0 & 1*/), 1. /* speed reference */)) {
   (*steeringPID).Init(1.1/* Kp */, .00001 /* Ki */, 21. /* Kd */);//
   (*throttlePID).Init(10./* Kp */, 0. /* Ki */, 100. /* Kd */);//
 }
@@ -107,39 +107,97 @@ whose range has been [adjusted](https://github.com/autohandle/CarNDPIDControlPro
 <br>
 ![sigmoid](./images/ErrorFunction.png)
 
+The throttle PID control is given a `speedReference` in the constructor: [ThrottlePID::ThrottlePID](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L85-L86)
+``` C++
+ThrottlePID::ThrottlePID(Sigmoid &theSigmoid, const double theSpeedReference) : PID(theSigmoid), speedReference(theSpeedReference) {
+}
+```
+The intuition for [ThrottlePID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L88-L98) is that, if the cross reference signal is 0, then the throttle should be increased toward the maximum (i.e. 1.0). The further away from 0, the lower the throttle should be, giving the steering control more time and distance to correct `theCrossTrackingError` of the car.
+``` C++
+const double /* throttle */ ThrottlePID::Update(const double theCrossTrackingError) {// throttle between 0 & 1
+  double pidControl=PID::Update(theCrossTrackingError);// -1 -> +1
+  double throttleFactor=1.-abs(pidControl);// abs: +1 -> 0 -> +1 // 1-abs: 0 -> +1 -> 0
+  double newSpeed=throttleFactor*speedReference;
+  return newSpeed;
+}
+```
+Implementing the intuition, [ThrottlePID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L88-L98) obtains the three parameter sigmoid PID signal clamped between 0 and 1, just like steering does, from [PID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L54-L80)  using `theCrossTrackingError` 
+<br>
+![Logistic Function](./images/LogFuncAt095.png)
+<br>
+The absolute value of the [PID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L54-L80) is calculated because only the value of the [PID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L54-L80) signal makes a difference.
+<br>
+![Absolute Logistic Function](./images/AbsLogFuncAt095.png)
+<br>
+Then the [PID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L54-L80) signal is subtracted from 1.0, in order to move the throttle toward 0 when the `theCrossTrackingError` is offset from 0 and 1 when it is not and there is no cross tracking error.
+<br>
+![Absolute Logistic Function](./images/1MinusAbsLogFuncAt095.png)
+<br>
+Then the `throttleFactor`, now between 0 and 1, multiplies the `speedReference`, which is also fixed between 0 and 1 when passed in the constructor, giving the `newSpeed`. The `newSpeed` is return to the caller, [CarControl::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/590473f6dcaee40b02275dbb96be24f5be064f0f/src/PID.cpp#L124-L132), which sets the `throttle` for the car.
+
 #### Reflection
 ##### The effect each of the P, I, D components
 
-The simulation shows a completion time of: 64 seconds. I ran the simulation several times and the maximum finishing time was 95 seconds — that worst-case performance can be viewed in the [video](https://s3.amazonaws.com/autohandle.com/video/CarNDKidnappedVehicleProject.mp4).
-l
+The PID controllers were initialized in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L115-L119) constructor.
+``` C++
+CarControl::CarControl() :  steeringPID(new PID(*(new P1M1SlopedSigmoid(0.207)))),
+throttlePID(new ThrottlePID(*(new P1M1SlopedSigmoid(.095)/* throttle between 0 & 1*/), 1. /* speed reference */)) {
+  (*steeringPID).Init(1.1/* Kp */, .00001 /* Ki */, 21. /* Kd */);//
+  (*throttlePID).Init(10./* Kp */, 0. /* Ki */, 100. /* Kd */);//
+}
+```
+The PID values were roughly set from the homework and then the minimum and maximum values were tracked in [PID::recordExtremes](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L21-L27).
+``` C++
+const void PID::recordExtremes(const double theControlSignal, const double theDifferentialControlSignal) {
+  maximumControlSignal=max(maximumControlSignal,theControlSignal);
+  minimumControlSignal=min(minimumControlSignal,theControlSignal);
+
+  maximumDifferentialControlSignal=max(maximumDifferentialControlSignal,theDifferentialControlSignal);
+  minimumDifferentialControlSignal=min(maximumDifferentialControlSignal,theDifferentialControlSignal);
+}
+```
+###### Steering
+If the car is going very slow, then steering for the track would approximate a straight line and the most significant factor would be the correction for the cross track error. If the car has some speed, then the track curvature becomes significant and the differential error needed to have the same level of effect as the cross track error. Typical values for the steering cross track error varied from +10 to -10 and for the differential error from +1 to -1. The parameter for the cross track error and the dfferential error reflect this order of magnitude difference. The cross track error parameter is around 1. and the differential error is around 20. Since the track curves significantly back and forth, the integration parameter is not significant for correcting an inherent bias.
+###### Throttle
+The intuition for [ThrottlePID::Update](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L88-L98) is that, if the cross reference signal is 0, then the throttle should be increased toward the maximum (i.e. 1.0). The further away from 0, the lower the throttle should be, giving the steering control more time and distance to correct `theCrossTrackingError` of the car.
+
+Again, typical values for the steering cross track error varied from +10 to -10 and for the differential error from +1 to -1. The parameter for the cross track error and the dfferential error reflect the order of magnitude difference. The cross track error parameter is around 10. and the differential error is around 100. Since the track curves significantly back and forth, the integration parameter is not significant for correcting an inherent bias.
+
 ##### Describe how the final hyperparameters were chosen.
 
-###### [ParticleFilter::init](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/24502292382ccf2178b8a5f79b45967ffa671ea8/src/particle_filter.cpp#L23-L49)
+The initial PID values were selected by setting the veocity very low, so that the track would approximate a straight line. At low speeds, the approximate parameters in the homework were effective.
 
-The main program first initializes the [ParticleFilter](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/master/src/particle_filter.cpp) in [ParticleFilter::init](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/24502292382ccf2178b8a5f79b45967ffa671ea8/src/particle_filter.cpp#L23-L49) with 500 particles in a random state (x,y, and theta) around an initial x,y gps reading,
-
+After the car was staying on the track, then the minimum and maximum values were tracked in [PID::recordExtremes](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L21-L27). These values were printed and
 ``` C++
-for (int particle = 0; particle < num_particles; ++particle) {
-    double sample_x, sample_y, sample_theta;
-    
-    // TODO: Sample  and from these normal distrubtions like this:
-    // sample_x = dist_x(gen);
-    // where "gen" is the random engine initialized earlier.
-    sample_x=dist_x(gen);
-    sample_y=dist_y(gen);
-    sample_theta=dist_theta(gen);
-    addParticleToFilter(createParticle(sample_x, sample_y, sample_theta));
-  }
-
-  is_initialized=true;
+// stable    throttle:0.4 maxCTE:4.6634, minCTE:-2.281 , maxdCTE:1.0997, mindCTE:-0.0002
+// stable    throttle:0.8 Ks:1.,.001,50. Kt:0,0,100 maxCTE:4.7047,minCTE:-2.9494,maxdCTE:0.6007, mindCTE:0.0358
+// stable    throttle:0.8 Ks:2.,.001,50. Kt:0,0,100 maxCTE:5.197,minCTE:-2.4486,maxdCTE:0.9299, mindCTE:-0.1169
+// unstable  throttle:0.8 Ks:.5,.001,50. Kt:0,0,100 maxCTE:9.4153,minCTE:-3.985,maxdCTE:1.0062, mindCTE:-0.0637
+// stable    throttle:0.8 Ks:1.,.001,25. Kt:0,0,100 maxCTE:3.3424,minCTE:-3.4471,maxdCTE:0.4412, mindCTE:0.0411
+// unstable  throttle:0.8 Ks:1.,.001,15. Kt:0,0,100 maxCTE:6.0274,minCTE:-6.272,maxdCTE:1.4978, mindCTE:-0.0074
+// stable    throttle:0.8 Ks:1.,.001,20. Kt:0,0,100 maxCTE:3.5335,minCTE:-3.7681,maxdCTE:1.7446, mindCTE:0.0561
+// unstable  throttle:0.8 Ks:1.,.001,30. Kt:0,0,100 maxCTE:24.1299,minCTE:-3.637,maxdCTE:0.9075, mindCTE:-0.2219
+// stableX   throttle:0.8 Ks:1.,.001,25. Kt:0,0,100 maxCTE:3.3424,minCTE:-3.4471,maxdCTE:0.4412, mindCTE:0.0411
+// stable    throttle:0.8 Ks:.9,.001,25. Kt:0,0,100 maxCTE:3.4722,minCTE:-3.5238,maxdCTE:0.5117, mindCTE:-0.0364
+// stable    throttle:0.8 Ks:.9,.001,25. Kt:1,0,100 maxCTE:3.8671,minCTE:-3.566, maxdCTE:1.5902, mindCTE:-0.0082
+// stable    throttle:0.8 Ks:.9,.001,25. Kt:2,0,100 maxCTE:3.4327, minCTE:-3.8073, maxdCTE:2.099, mindCTE:0.0036
+// stable    throttle:0.8 Ks:.9,.001,25. Kt:2,0,100 maxCTE:3.8947, minCTE:-3.7933, maxdCTE:1.279, mindCTE:-0.0138
+// stable    throttle:0.8 Ks:.9,.001,25. Kt:2,0,100 maxCTE:3.4584, minCTE:-3.9159, maxdCTE:0.8101, mindCTE:-0.0664
 ```
-then the `is_initialized` flag is set so that the main program does not try to initialize [ParticleFilter](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/master/src/particle_filter.cpp) again.
-
-After initialization, the main program loops through: [ParticleFilter::prediction](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/24502292382ccf2178b8a5f79b45967ffa671ea8/src/particle_filter.cpp#L58-L98), [ParticleFilter::updateWeights](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/24502292382ccf2178b8a5f79b45967ffa671ea8/src/particle_filter.cpp#L145-L183), and [ParticleFilter::resample](https://github.com/autohandle/CarNDKidnappedVehicleProject/blob/24502292382ccf2178b8a5f79b45967ffa671ea8/src/particle_filter.cpp#L185-L240).
+were used to inform the selection of the PID parameters. Since a sigmoid was used to clamp the PID control value between 0 and 1, and additional parameter was the slope of the sigmoid which was set in the [CarControl::CarControl](https://github.com/autohandle/CarNDPIDControlProject/blob/2b1cd0f2237d983be191b6bb04ea4b0fa7ef4d8d/src/PID.cpp#L115-L119) constructor. All of the parameters were set by using trial and error hand-held gradient descent.
 
 #### Simulation
 
-[PID Controller Project](https://s3.amazonaws.com/autohandle.com/video/CarNDPIDControlProject70.mp4)
+The video of the car with the parameters in the checked-in code:
+[PID Controller](https://s3.amazonaws.com/autohandle.com/video/CarNDPIDControlProject100.mp4)
+
+Too late in the project, I discovered that a negative throttle would apply the brakes, so I changed the clamp for the throttle to vary from -1 to +1
+<br>
+![-1 to +1 Logistic Function](./images/1Minus2xAbsLogFuncAt095.png)
+<br>
+Thr car is now a bit more aggresive and skids around the first turn after the bridge with the brakes on:
+[Braking PID Controller](https://s3.amazonaws.com/autohandle.com/video/CarNDPIDControlProjectBraking.mp4)
+
 
 The video was created by using a [screen recording tool](http://www.idownloadblog.com/2016/02/26/how-to-record-part-of-mac-screen-quicktime/).
 
