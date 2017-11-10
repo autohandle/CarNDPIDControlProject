@@ -6,10 +6,11 @@
 ``` shell
 Softwares-MacBook-Pro:tmp david$ git clone https://github.com/autohandle/CarNDPIDControlProject
 Cloning into 'CarNDPIDControlProject'...
-remote: Counting objects: 89, done.
-remote: Compressing objects: 100% (41/41), done.
-remote: Total 89 (delta 46), reused 89 (delta 46), pack-reused 0
-Unpacking objects: 100% (89/89), done.
+remote: Counting objects: 120, done.
+remote: Compressing objects: 100% (64/64), done.
+remote: Total 120 (delta 57), reused 117 (delta 54), pack-reused 0
+Receiving objects: 100% (120/120), 309.86 KiB | 4.00 KiB/s, done.
+Resolving deltas: 100% (57/57), done.
 Softwares-MacBook-Pro:tmp david$ cd CarNDPIDControlProject/
 Softwares-MacBook-Pro:CarNDPIDControlProject david$ mkdir build
 Softwares-MacBook-Pro:CarNDPIDControlProject david$ cd build
@@ -34,15 +35,7 @@ Softwares-MacBook-Pro:build david$ cmake ..
 Softwares-MacBook-Pro:build david$ make
 Scanning dependencies of target pid
 [ 33%] Building CXX object CMakeFiles/pid.dir/src/PID.cpp.o
-/tmp/CarNDPIDControlProject/src/PID.cpp:83:1: warning: control reaches end of non-void function [-Wreturn-type]
-}
-^
-1 warning generated.
 [ 66%] Building CXX object CMakeFiles/pid.dir/src/main.cpp.o
-/tmp/CarNDPIDControlProject/src/main.cpp:58:18: warning: unused variable 'angle' [-Wunused-variable]
-          double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-                 ^
-1 warning generated.
 [100%] Linking CXX executable pid
 ld: warning: directory not found for option '-L/usr/local/Cellar/libuv/1.11.0/lib'
 [100%] Built target pid
