@@ -80,6 +80,7 @@ const double /* new control value */ PID::Update(const double theControlSignal) 
 }
 
 double PID::TotalError() {
+  return 0.;
 }
 
 ThrottlePID::ThrottlePID(Sigmoid &theSigmoid, const double theSpeedReference) : PID(theSigmoid), speedReference(theSpeedReference) {
@@ -89,6 +90,7 @@ const double /* throttle */ ThrottlePID::Update(const double theCrossTrackingErr
   // PID::Update between -1 & 1 -> throttleFactor is 0 at 1 & 1 at 0 -> between 0 & 1
   double pidControl=PID::Update(theCrossTrackingError);// -1 -> +1
   double throttleFactor=1.-abs(pidControl);// abs: +1 -> 0 -> +1 // 1-abs: 0 -> +1 -> 0
+  //double throttleFactor=1.-1.75*abs(pidControl);// abs: +1 -> 0 -> +1 // 1-abs: 0 -> +1 -> 0
   if (DEBUGPRINT) std::cout << "ThrottlePID-pidControl:" << pidControl << ", throttleFactor:" << throttleFactor << std::endl;
   if (DEBUGPRINT) PID::printExtremes();
   double newSpeed=throttleFactor*speedReference;

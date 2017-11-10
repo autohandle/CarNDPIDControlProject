@@ -55,7 +55,7 @@ int main()
           // j[1]: {"cte":"0.7598","image":"/9j ...", speed":"0.0000","steering_angle":"0.0000","throttle":"0.0000"}
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
-          double angle = std::stod(j[1]["steering_angle"].get<std::string>());
+          //double angle = std::stod(j[1]["steering_angle"].get<std::string>());
           double steer_value;
           double throttle;
           /*
